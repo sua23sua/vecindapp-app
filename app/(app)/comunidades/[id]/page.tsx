@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Send } from "lucide-react";
+import CommunityHeader from "./CommunityHeader";
 import OwnersTable from "./OwnersTable";
 
 export const dynamic = "force-dynamic";
@@ -25,24 +24,7 @@ export default async function ComunidadDetail({ params }: { params: Promise<{ id
 
   return (
     <div>
-      <div className="mb-6">
-        <Link href="/comunidades" className="inline-flex items-center gap-1.5 text-sm text-[#475569] hover:text-[#1A56DB] transition-colors mb-4">
-          <ArrowLeft className="w-4 h-4" /> Volver a comunidades
-        </Link>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-[#1A3C6E]">{community.name}</h1>
-            <p className="text-[#475569] mt-1">{community.address}</p>
-          </div>
-          <Link
-            href={`/enviar?community=${id}`}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1A56DB] text-white text-sm font-semibold rounded-xl hover:bg-[#1A3C6E] transition-colors shadow-sm flex-shrink-0"
-          >
-            <Send className="w-4 h-4" /> Enviar aviso
-          </Link>
-        </div>
-      </div>
-
+      <CommunityHeader id={community.id} name={community.name} address={community.address} />
       <OwnersTable communityId={id} initialOwners={owners} />
     </div>
   );

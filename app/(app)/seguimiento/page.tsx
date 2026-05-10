@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { FileText, Users, CheckCheck, Eye, AlertCircle } from "lucide-react";
 import { statusColor, statusLabel } from "@/lib/display";
+import ExportButton from "./ExportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -95,9 +96,7 @@ export default async function SeguimientoPage() {
                 </div>
 
                 <div className="px-5 py-3 bg-[#F8FAFC] border-t border-[#E2E8F0]">
-                  <button className="text-sm font-semibold text-[#1A56DB] hover:text-[#1A3C6E] transition-colors flex items-center gap-1.5">
-                    <FileText className="w-4 h-4" /> Exportar informe PDF de evidencia
-                  </button>
+                  <ExportButton campaign={c} />
                 </div>
               </div>
             );

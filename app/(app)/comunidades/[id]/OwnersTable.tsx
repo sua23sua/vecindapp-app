@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Phone, Plus, Upload, Pencil, Trash2, Home, X } from "lucide-react";
+import { Users, Phone, Plus, Upload, Pencil, Trash2, Home, X, AlertCircle } from "lucide-react";
+import * as XLSX from "xlsx";
 
 type Owner = {
   id: string;
@@ -28,6 +29,9 @@ export default function OwnersTable({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editOwner, setEditOwner] = useState({ name: "", unit: "", phone: "" });
+  const [importRows, setImportRows] = useState<{ name: string; unit: string; phone: string }[] | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
 
@@ -56,6 +60,51 @@ export default function OwnersTable({
   const handleDelete = async (ownerId: string) => {
     const { error } = await supabase.from("owners").delete().eq("id", ownerId);
     if (!error) setOwners(prev => prev.filter(o => o.id !== ownerId));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: "" });
+      const normalize = (row: Record<string, string>, ...keys: string[]) => {
+        for (const k of keys) {
+          const val = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()] ?? "";
+          if (val) return String(val).trim();
+        }
+        return "";
+      };
+      const parsed = json.map(row => ({
+        name: normalize(row, "nombre", "name", "Nombre", "propietario", "Propietario"),
+        unit: normalize(row, "piso", "vivienda", "unidad", "unit", "Piso", "Vivienda"),
+        phone: normalize(row, "telefono", "teléfono", "phone", "movil", "móvil", "Teléfono"),
+      })).filter(r => r.name && r.phone);
+      setImportRows(parsed);
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importRows?.length) return;
+    setImporting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setImporting(false); return; }
+    const inserts = importRows.map(r => ({
+      community_id: communityId,
+      name: r.name,
+      unit: r.unit,
+      phone: r.phone,
+      email: null,
+    }));
+    const { data } = await supabase.from("owners").insert(inserts as any).select();
+    if (data) setOwners(prev => [...prev, ...(data as Owner[])]);
+    setImportRows(null);
+    setImporting(false);
   };
 
   const startEdit = (o: Owner) => {
@@ -101,11 +150,63 @@ export default function OwnersTable({
         </div>
       </div>
 
+      {/* Import preview modal */}
+      {importRows && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+              <div>
+                <p className="font-semibold text-[#1A3C6E]">Previsualización de importación</p>
+                <p className="text-sm text-[#475569]">{importRows.length} propietarios encontrados</p>
+              </div>
+              <button onClick={() => setImportRows(null)}><X className="w-5 h-5 text-[#475569]" /></button>
+            </div>
+            <div className="max-h-72 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[#F8FAFC] sticky top-0">
+                  <tr className="text-xs text-[#475569] uppercase">
+                    <th className="px-4 py-2 text-left">Nombre</th>
+                    <th className="px-4 py-2 text-left">Piso</th>
+                    <th className="px-4 py-2 text-left">Teléfono</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1F5F9]">
+                  {importRows.map((r, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-2 font-medium text-[#1E293B]">{r.name}</td>
+                      <td className="px-4 py-2 text-[#475569]">{r.unit || "—"}</td>
+                      <td className="px-4 py-2 text-[#475569]">{r.phone}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {importRows.length === 0 && (
+              <div className="px-6 py-8 text-center text-[#475569]">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">No se detectaron filas válidas. Asegúrate de que el Excel tiene columnas: <strong>nombre</strong>, <strong>piso</strong>, <strong>teléfono</strong>.</p>
+              </div>
+            )}
+            <div className="flex gap-3 px-6 py-4 border-t border-[#E2E8F0]">
+              <button onClick={() => setImportRows(null)} className="flex-1 py-2 border border-[#E2E8F0] text-sm font-medium text-[#475569] rounded-xl hover:bg-[#F8FAFC]">Cancelar</button>
+              <button
+                onClick={handleImportConfirm}
+                disabled={importing || importRows.length === 0}
+                className="flex-1 py-2 bg-[#1A56DB] text-white text-sm font-medium rounded-xl hover:bg-[#1A3C6E] disabled:opacity-60"
+              >
+                {importing ? "Importando…" : `Importar ${importRows.length} propietarios`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-[#1A3C6E]">Propietarios</h2>
         <div className="flex gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 border border-[#E2E8F0] bg-white text-sm font-medium text-[#475569] rounded-xl hover:border-[#1A56DB] hover:text-[#1A56DB] transition-colors">
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+          <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 border border-[#E2E8F0] bg-white text-sm font-medium text-[#475569] rounded-xl hover:border-[#1A56DB] hover:text-[#1A56DB] transition-colors">
             <Upload className="w-4 h-4" /> Importar Excel
           </button>
           <button
