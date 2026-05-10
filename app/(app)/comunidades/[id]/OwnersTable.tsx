@@ -36,7 +36,8 @@ export default function OwnersTable({
 
     const { data, error } = await supabase
       .from("owners")
-      .insert({ community_id: communityId, ...newOwner, email: null })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .insert({ community_id: communityId, name: newOwner.name, unit: newOwner.unit, phone: newOwner.phone, email: null } as any)
       .select()
       .single();
 
