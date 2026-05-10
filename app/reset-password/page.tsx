@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { MessageSquare, Lock, AlertCircle, CheckCheck } from "lucide-react";
@@ -12,6 +12,22 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Supabase puts the session tokens in the URL hash after redirect
+    const supabase = createClient();
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setReady(true);
+    });
+    // Also handle hash-based tokens
+    const hash = window.location.hash;
+    if (hash.includes("access_token")) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) setReady(true);
+      });
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +80,7 @@ export default function ResetPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#1E293B] mb-1">Nueva contraseña</label>
+                  <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Nueva contraseña</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
                     <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
@@ -72,7 +88,7 @@ export default function ResetPasswordPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#1E293B] mb-1">Confirmar contraseña</label>
+                  <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Confirmar contraseña</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
                     <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)}
