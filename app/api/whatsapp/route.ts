@@ -52,12 +52,15 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { communities, message, campaignTitle, hasPdf } = await req.json() as {
+  const formData = await req.formData();
+  const rawData = formData.get("data") as string;
+  const pdfFile = formData.get("pdf") as File | null;
+  const { communities, message, campaignTitle } = JSON.parse(rawData) as {
     communities: CommunityPayload[];
     message: string;
     campaignTitle: string;
-    hasPdf: boolean;
   };
+  const hasPdf = !!pdfFile;
 
   const results: { community: string; sent: number; failed: number }[] = [];
 

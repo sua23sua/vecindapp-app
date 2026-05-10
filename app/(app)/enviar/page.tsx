@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRef } from "react";
 import { Send, Paperclip, Eye, Users, CheckCheck, X } from "lucide-react";
 
 const VARIABLES = ["{{nombre}}", "{{vivienda}}", "{{comunidad}}", "{{fecha_junta}}"];
@@ -18,10 +19,11 @@ export default function EnviarPage() {
     "Estimado/a {{nombre}}, propietario/a de {{vivienda}}:\n\nLe convocamos a la Junta General de la comunidad {{comunidad}} el {{fecha_junta}}.\n\nRogamos confirme asistencia respondiendo a este mensaje.\n\nAtentamente,\nLa Administración"
   );
   const [selectedCommunities, setSelectedCommunities] = useState<string[]>([]);
-  const [hasPdf, setHasPdf] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [campaignTitle, setCampaignTitle] = useState("");
   const [sendResults, setSendResults] = useState<{ community: string; sent: number; failed: number }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -43,16 +45,11 @@ export default function EnviarPage() {
 
   const handleSend = async () => {
     setSending(true);
-    const res = await fetch("/api/whatsapp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        communities: selectedComms,
-        message,
-        campaignTitle,
-        hasPdf,
-      }),
-    });
+    const formData = new FormData();
+    formData.append("data", JSON.stringify({ communities: selectedComms, message, campaignTitle }));
+    if (pdfFile) formData.append("pdf", pdfFile);
+
+    const res = await fetch("/api/whatsapp", { method: "POST", body: formData });
     const json = await res.json();
     setSendResults(json.results ?? []);
     setSending(false);
@@ -96,7 +93,7 @@ export default function EnviarPage() {
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
-            onClick={() => { setStep("redactar"); setSelectedCommunities([]); setHasPdf(false); setCampaignTitle(""); setSendResults([]); }}
+            onClick={() => { setStep("redactar"); setSelectedCommunities([]); setPdfFile(null); setCampaignTitle(""); setSendResults([]); }}
             className="px-5 py-2.5 bg-[#1A56DB] text-white font-semibold rounded-xl hover:bg-[#1A3C6E] transition-colors"
           >
             Nuevo aviso
@@ -170,14 +167,24 @@ export default function EnviarPage() {
 
           <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-sm">
             <label className="block text-sm font-semibold text-[#1A3C6E] mb-3">Adjunto PDF (opcional)</label>
-            {hasPdf ? (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={e => setPdfFile(e.target.files?.[0] ?? null)}
+            />
+            {pdfFile ? (
               <div className="flex items-center gap-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3">
                 <Paperclip className="w-4 h-4 text-[#1A56DB]" />
-                <span className="text-sm text-[#1E293B] flex-1">documento.pdf</span>
-                <button onClick={() => setHasPdf(false)}><X className="w-4 h-4 text-[#475569]" /></button>
+                <span className="text-sm text-[#1E293B] flex-1 truncate">{pdfFile.name}</span>
+                <span className="text-xs text-[#475569]">{(pdfFile.size / 1024 / 1024).toFixed(1)} MB</span>
+                <button onClick={() => { setPdfFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
+                  <X className="w-4 h-4 text-[#475569]" />
+                </button>
               </div>
             ) : (
-              <button onClick={() => setHasPdf(true)}
+              <button onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-[#E2E8F0] rounded-xl text-sm text-[#475569] hover:border-[#1A56DB] hover:text-[#1A56DB] transition-colors w-full">
                 <Paperclip className="w-4 h-4" /> Adjuntar PDF (máx. 16 MB)
               </button>
@@ -255,7 +262,7 @@ export default function EnviarPage() {
                 </div>
                 <div className="bg-[#DCF8C6] rounded-2xl rounded-tl-none p-4 shadow-sm max-w-sm">
                   <p className="text-[#1E293B] text-sm whitespace-pre-wrap leading-relaxed">{preview(firstOwner, firstComm)}</p>
-                  {hasPdf && (
+                  {!!pdfFile && (
                     <div className="mt-3 flex items-center gap-2 bg-white/60 rounded-lg p-2">
                       <Paperclip className="w-4 h-4 text-[#475569]" />
                       <span className="text-xs font-medium text-[#1E293B]">documento.pdf</span>
@@ -276,7 +283,7 @@ export default function EnviarPage() {
                   ["Título", campaignTitle || "(sin título)"],
                   ["Comunidades", selectedCommunities.length],
                   ["Propietarios", totalRecipients],
-                  ["PDF adjunto", hasPdf ? "Sí" : "No"],
+                  ["PDF adjunto", pdfFile ? pdfFile.name : "No"],
                   ["Tiempo estimado", `~${Math.ceil(totalRecipients * 0.2)} min`],
                 ].map(([k, v]) => (
                   <div key={String(k)} className="flex justify-between py-2">
