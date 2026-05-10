@@ -19,9 +19,13 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { session } } = await supabase.auth.getSession();
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
+  const { pathname } = request.nextUrl;
 
-  if (!session && !isLoginPage) {
+  const publicPaths = ["/login", "/register", "/verify-email", "/forgot-password", "/reset-password", "/auth/callback"];
+  const isPublic = publicPaths.some(p => pathname.startsWith(p));
+  const isLoginPage = pathname.startsWith("/login");
+
+  if (!session && !isPublic) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

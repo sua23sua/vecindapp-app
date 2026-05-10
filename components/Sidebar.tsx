@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   CreditCard,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -21,6 +22,7 @@ const nav = [
   { href: "/enviar",       label: "Enviar aviso",  icon: Send },
   { href: "/seguimiento",  label: "Seguimiento",   icon: ClipboardList },
   { href: "/plan",         label: "Mi plan",       icon: CreditCard },
+  { href: "/ajustes",      label: "Ajustes",       icon: Settings },
 ];
 
 export default function Sidebar() {

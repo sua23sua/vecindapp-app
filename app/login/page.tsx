@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import { MessageSquare, Lock, Mail, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
@@ -65,7 +66,10 @@ export default function LoginPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#1E293B] mb-1">Contraseña</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-[#1E293B]">Contraseña</label>
+                <Link href="/forgot-password" className="text-xs text-[#1A56DB] hover:underline">¿Olvidaste tu contraseña?</Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
                 <input
@@ -89,9 +93,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-xs text-center text-[#475569]">
             ¿No tienes cuenta?{" "}
-            <a href="https://vecindapp-blond.vercel.app#registro" className="text-[#1A56DB] hover:underline font-medium">
-              Solicitar acceso
-            </a>
+            <Link href="/register" className="text-[#1A56DB] hover:underline font-medium">Regístrate</Link>
           </p>
         </div>
 

@@ -9,11 +9,12 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function planFromPriceId(priceId: string): string {
+function planFromPriceId(priceId: string): { plan: string; tier: string } {
   for (const p of PLANS) {
-    if (priceId === p.priceIdBase || priceId === p.priceIdPlus) return p.id;
+    if (priceId === p.priceIdBase) return { plan: p.id, tier: "base" };
+    if (priceId === p.priceIdPlus) return { plan: p.id, tier: "plus" };
   }
-  return "unknown";
+  return { plan: "unknown", tier: "base" };
 }
 
 async function upsertSubscription(sub: Stripe.Subscription) {
@@ -21,7 +22,7 @@ async function upsertSubscription(sub: Stripe.Subscription) {
   if (!userId) return;
 
   const priceId = sub.items.data[0]?.price.id ?? "";
-  const plan = planFromPriceId(priceId);
+  const { plan, tier } = planFromPriceId(priceId);
   const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString();
 
   await supabaseAdmin.from("subscriptions").upsert(
@@ -30,6 +31,7 @@ async function upsertSubscription(sub: Stripe.Subscription) {
       stripe_customer_id: sub.customer as string,
       stripe_subscription_id: sub.id,
       plan,
+      tier,
       status: sub.status,
       current_period_end: periodEnd,
       updated_at: new Date().toISOString(),
