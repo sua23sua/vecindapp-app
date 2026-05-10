@@ -26,6 +26,8 @@ export default function OwnersTable({
   const [newOwner, setNewOwner] = useState({ name: "", unit: "", phone: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editOwner, setEditOwner] = useState({ name: "", unit: "", phone: "" });
 
   const supabase = createClient();
 
@@ -54,6 +56,25 @@ export default function OwnersTable({
   const handleDelete = async (ownerId: string) => {
     const { error } = await supabase.from("owners").delete().eq("id", ownerId);
     if (!error) setOwners(prev => prev.filter(o => o.id !== ownerId));
+  };
+
+  const startEdit = (o: Owner) => {
+    setEditingId(o.id);
+    setEditOwner({ name: o.name, unit: o.unit, phone: o.phone });
+  };
+
+  const handleEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("owners")
+      .update({ name: editOwner.name, unit: editOwner.unit, phone: editOwner.phone } as any)
+      .eq("id", editingId);
+    if (!error) {
+      setOwners(prev => prev.map(o => o.id === editingId ? { ...o, ...editOwner } : o));
+      setEditingId(null);
+    }
+    setSaving(false);
   };
 
   return (
@@ -159,26 +180,41 @@ export default function OwnersTable({
             <tbody className="divide-y divide-[#E2E8F0]">
               {owners.map(o => (
                 <tr key={o.id} className="hover:bg-[#F8FAFC] transition-colors">
-                  <td className="px-5 py-3 font-medium text-[#1E293B]">{o.name}</td>
-                  <td className="px-5 py-3">
-                    <span className="flex items-center gap-1 text-[#475569]">
-                      <Home className="w-3 h-3" /> {o.unit}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-[#475569]">{o.phone}</td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button className="p-1.5 rounded-lg hover:bg-[#EFF6FF] text-[#475569] hover:text-[#1A56DB] transition-colors">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(o.id)}
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-[#475569] hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+                  {editingId === o.id ? (
+                    <>
+                      <td className="px-3 py-2"><input value={editOwner.name} onChange={e => setEditOwner(p => ({ ...p, name: e.target.value }))} className="w-full px-2 py-1.5 rounded-lg border border-[#1A56DB] text-sm focus:outline-none focus:ring-2 focus:ring-[#1A56DB]" /></td>
+                      <td className="px-3 py-2"><input value={editOwner.unit} onChange={e => setEditOwner(p => ({ ...p, unit: e.target.value }))} className="w-full px-2 py-1.5 rounded-lg border border-[#1A56DB] text-sm focus:outline-none focus:ring-2 focus:ring-[#1A56DB]" /></td>
+                      <td className="px-3 py-2"><input value={editOwner.phone} onChange={e => setEditOwner(p => ({ ...p, phone: e.target.value }))} className="w-full px-2 py-1.5 rounded-lg border border-[#1A56DB] text-sm focus:outline-none focus:ring-2 focus:ring-[#1A56DB]" /></td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={handleEdit} disabled={saving} className="px-3 py-1.5 bg-[#1A56DB] text-white text-xs font-medium rounded-lg hover:bg-[#1A3C6E] disabled:opacity-60">
+                            {saving ? "…" : "Guardar"}
+                          </button>
+                          <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg hover:bg-[#F8FAFC] text-[#475569]"><X className="w-4 h-4" /></button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-5 py-3 font-medium text-[#1E293B]">{o.name}</td>
+                      <td className="px-5 py-3">
+                        <span className="flex items-center gap-1 text-[#475569]">
+                          <Home className="w-3 h-3" /> {o.unit}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-[#475569]">{o.phone}</td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => startEdit(o)} className="p-1.5 rounded-lg hover:bg-[#EFF6FF] text-[#475569] hover:text-[#1A56DB] transition-colors">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(o.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#475569] hover:text-red-500 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
