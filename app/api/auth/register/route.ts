@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,24 +10,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      user_metadata: { full_name: nombre },
-      email_confirm: false,
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    // Call Supabase Auth REST API directly
+    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": serviceKey,
+        "Authorization": `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        user_metadata: { full_name: nombre },
+        email_confirm: false,
+      }),
     });
 
-    if (error) {
-      const msg = error.message.toLowerCase().includes("already")
-        ? "Este email ya está registrado."
-        : error.message;
-      return NextResponse.json({ error: msg }, { status: 400 });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const msg = (data?.msg ?? data?.message ?? "Error al crear la cuenta.") as string;
+      const userFacing = msg.toLowerCase().includes("already") ? "Este email ya está registrado." : msg;
+      return NextResponse.json({ error: userFacing }, { status: 400 });
     }
 
-    // Best-effort: send confirmation email (ignore errors)
-    await supabaseAdmin.auth.resend({ type: "signup", email }).catch(() => null);
+    // Trigger confirmation email
+    await fetch(`${supabaseUrl}/auth/v1/resend`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": serviceKey,
+        "Authorization": `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ type: "signup", email }),
+    }).catch(() => null);
 
-    return NextResponse.json({ ok: true, userId: data.user?.id });
+    return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("Register error:", e);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
