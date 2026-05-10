@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { MessageSquare, Lock, Mail, User, AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -35,7 +33,7 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push("/verify-email");
+    window.location.href = "/verify-email";
   };
 
   return (
