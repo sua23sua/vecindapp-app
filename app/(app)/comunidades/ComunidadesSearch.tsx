@@ -8,7 +8,7 @@ type Community = {
   id: string;
   name: string;
   address: string | null;
-  owners: unknown;
+  ownerCount: number;
 };
 
 export default function ComunidadesSearch({ communities }: { communities: Community[] }) {
@@ -19,9 +19,6 @@ export default function ComunidadesSearch({ communities }: { communities: Commun
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.address ?? "").toLowerCase().includes(search.toLowerCase())
   );
-
-  const ownerCount = (c: Community) =>
-    ((c.owners as { count: number }[])[0]?.count ?? 0);
 
   return (
     <>
@@ -53,7 +50,7 @@ export default function ComunidadesSearch({ communities }: { communities: Commun
             <div className="flex items-center gap-6 text-sm text-[#475569] flex-shrink-0">
               <div className="flex items-center gap-1.5">
                 <Users className="w-4 h-4" />
-                <span>{ownerCount(c)} propietarios</span>
+                <span>{c.ownerCount} propietarios</span>
               </div>
               <ChevronRight className="w-4 h-4 group-hover:text-[#1A56DB] transition-colors" />
             </div>

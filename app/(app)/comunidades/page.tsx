@@ -1,21 +1,32 @@
 import Link from "next/link";
-import { Building2, Users, ChevronRight, Plus } from "lucide-react";
+import { Building2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import ComunidadesSearch from "./ComunidadesSearch";
 
 export const dynamic = "force-dynamic";
 
+type Community = {
+  id: string;
+  name: string;
+  address: string | null;
+  ownerCount: number;
+};
+
 export default async function ComunidadesPage() {
   const supabase = await createClient();
-  const { data: communities } = await supabase
+  const { data: raw } = await supabase
     .from("communities")
     .select("id, name, address, owners(count)")
     .order("created_at", { ascending: false });
 
-  const totalOwners = communities?.reduce(
-    (s, c) => s + ((c.owners as unknown as { count: number }[])[0]?.count ?? 0),
-    0
-  ) ?? 0;
+  const communities: Community[] = (raw ?? []).map((c: Record<string, unknown>) => ({
+    id: c.id as string,
+    name: c.name as string,
+    address: c.address as string | null,
+    ownerCount: (c.owners as { count: number }[])[0]?.count ?? 0,
+  }));
+
+  const totalOwners = communities.reduce((s, c) => s + c.ownerCount, 0);
 
   return (
     <div>
@@ -23,7 +34,7 @@ export default async function ComunidadesPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#1A3C6E]">Comunidades</h1>
           <p className="text-[#475569] mt-1">
-            {communities?.length ?? 0} comunidades · {totalOwners} propietarios
+            {communities.length} comunidades · {totalOwners} propietarios
           </p>
         </div>
         <Link
@@ -34,7 +45,7 @@ export default async function ComunidadesPage() {
         </Link>
       </div>
 
-      <ComunidadesSearch communities={communities ?? []} />
+      <ComunidadesSearch communities={communities} />
     </div>
   );
 }
