@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// Strip BOM (U+FEFF) that can be introduced when copy-pasting env values
 const stripBom = (s: string) => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
 
 export async function POST(req: NextRequest) {
@@ -13,43 +12,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL!);
-    const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL!).replace(/\/$/, "");
+    const anonKey = stripBom(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
 
-    // Call Supabase Auth REST API directly
-    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+    const res = await fetch(`${supabaseUrl}/auth/v1/signup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "apikey": serviceKey,
-        "Authorization": `Bearer ${serviceKey}`,
+        "apikey": anonKey,
+        "Authorization": `Bearer ${anonKey}`,
       },
       body: JSON.stringify({
         email,
         password,
-        user_metadata: { full_name: nombre },
-        email_confirm: false,
+        data: { full_name: nombre },
       }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      const msg = (data?.msg ?? data?.message ?? "Error al crear la cuenta.") as string;
-      const userFacing = msg.toLowerCase().includes("already") ? "Este email ya está registrado." : msg;
+      const msg = (data?.msg ?? data?.message ?? data?.error_description ?? "Error al crear la cuenta.") as string;
+      const userFacing = msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registered")
+        ? "Este email ya está registrado."
+        : msg;
       return NextResponse.json({ error: userFacing }, { status: 400 });
     }
-
-    // Trigger confirmation email
-    await fetch(`${supabaseUrl}/auth/v1/resend`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": serviceKey,
-        "Authorization": `Bearer ${serviceKey}`,
-      },
-      body: JSON.stringify({ type: "signup", email }),
-    }).catch(() => null);
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
