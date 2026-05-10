@@ -12,10 +12,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL!).replace(/\/$/, "");
+    // Use only the origin to avoid any stray /rest/v1 path in the env var
+    const rawUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL!);
+    const supabaseOrigin = new URL(rawUrl).origin;
     const anonKey = stripBom(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
 
-    const res = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+    const res = await fetch(`${supabaseOrigin}/auth/v1/signup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -31,10 +33,13 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
-    // Return full Supabase response for debugging
     if (!res.ok) {
       console.error("Supabase signup error:", JSON.stringify(data));
-      return NextResponse.json({ error: JSON.stringify(data) }, { status: 400 });
+      const msg = (data?.msg ?? data?.message ?? data?.error_description ?? "Error al crear la cuenta.") as string;
+      const userFacing = msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registered")
+        ? "Este email ya está registrado."
+        : msg;
+      return NextResponse.json({ error: userFacing }, { status: 400 });
     }
 
     return NextResponse.json({ ok: true });
