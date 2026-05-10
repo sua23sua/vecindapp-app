@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
   }
 
+  // Create user without auto-confirming
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -24,19 +25,17 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) {
-    const msg = error.message.includes("already registered") || error.message.includes("already been registered")
+    const msg = error.message.toLowerCase().includes("already")
       ? "Este email ya está registrado."
       : error.message;
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  // Send confirmation email via Supabase
-  await supabaseAdmin.auth.admin.generateLink({
+  // Trigger Supabase to send the confirmation email
+  await supabaseAdmin.auth.resend({
     type: "signup",
     email,
-    options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-    },
+    options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback` },
   });
 
   return NextResponse.json({ ok: true, userId: data.user?.id });
