@@ -10,33 +10,33 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: NextRequest) {
-  const { email, password, nombre } = await req.json() as { email: string; password: string; nombre: string };
+  try {
+    const { email, password, nombre } = await req.json() as { email: string; password: string; nombre: string };
 
-  if (!email || !password || password.length < 8) {
-    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+    if (!email || !password || password.length < 8) {
+      return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+    }
+
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      user_metadata: { full_name: nombre },
+      email_confirm: false,
+    });
+
+    if (error) {
+      const msg = error.message.toLowerCase().includes("already")
+        ? "Este email ya está registrado."
+        : error.message;
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
+    // Best-effort: send confirmation email (ignore errors)
+    await supabaseAdmin.auth.resend({ type: "signup", email }).catch(() => null);
+
+    return NextResponse.json({ ok: true, userId: data.user?.id });
+  } catch (e) {
+    console.error("Register error:", e);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
-
-  // Create user without auto-confirming
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    user_metadata: { full_name: nombre },
-    email_confirm: false,
-  });
-
-  if (error) {
-    const msg = error.message.toLowerCase().includes("already")
-      ? "Este email ya está registrado."
-      : error.message;
-    return NextResponse.json({ error: msg }, { status: 400 });
-  }
-
-  // Trigger Supabase to send the confirmation email
-  await supabaseAdmin.auth.resend({
-    type: "signup",
-    email,
-    options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback` },
-  });
-
-  return NextResponse.json({ ok: true, userId: data.user?.id });
 }

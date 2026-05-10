@@ -20,15 +20,17 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
 
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, nombre }),
-    });
-    const json = await res.json();
-
-    if (!res.ok) {
-      setError(json.error ?? "Error al crear la cuenta.");
+    let json: { ok?: boolean; error?: string } = {};
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, nombre }),
+      });
+      json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al crear la cuenta.");
+    } catch (e: any) {
+      setError(e.message ?? "Error al crear la cuenta.");
       setLoading(false);
       return;
     }
