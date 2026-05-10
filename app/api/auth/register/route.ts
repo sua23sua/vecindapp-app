@@ -31,12 +31,10 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
+    // Return full Supabase response for debugging
     if (!res.ok) {
-      const msg = (data?.msg ?? data?.message ?? data?.error_description ?? "Error al crear la cuenta.") as string;
-      const userFacing = msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registered")
-        ? "Este email ya está registrado."
-        : msg;
-      return NextResponse.json({ error: userFacing }, { status: 400 });
+      console.error("Supabase signup error:", JSON.stringify(data));
+      return NextResponse.json({ error: JSON.stringify(data) }, { status: 400 });
     }
 
     return NextResponse.json({ ok: true });
