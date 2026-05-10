@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+// Strip BOM (U+FEFF) that can be introduced when copy-pasting env values
+const stripBom = (s: string) => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password, nombre } = await req.json() as { email: string; password: string; nombre: string };
@@ -10,8 +13,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL!);
+    const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
     // Call Supabase Auth REST API directly
     const res = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
