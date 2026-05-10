@@ -1,9 +1,9 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = "VecindApp <no-reply@vecindapp.es>";
 
 export async function sendTeamInvite(to: string, invitedBy: string, registerUrl: string) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
   return resend.emails.send({
     from: FROM,
     to,
