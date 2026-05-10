@@ -21,6 +21,7 @@ export default function EnviarPage() {
   const [hasPdf, setHasPdf] = useState(false);
   const [sending, setSending] = useState(false);
   const [campaignTitle, setCampaignTitle] = useState("");
+  const [sendResults, setSendResults] = useState<{ community: string; sent: number; failed: number }[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -42,40 +43,18 @@ export default function EnviarPage() {
 
   const handleSend = async () => {
     setSending(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setSending(false); return; }
-
-    for (const comm of selectedComms) {
-      const { data: campaign } = await supabase
-        .from("campaigns")
-        .insert({
-          user_id: user.id,
-          community_id: comm.id,
-          community_name: comm.name,
-          title: campaignTitle || "Aviso",
-          message,
-          has_pdf: hasPdf,
-          sent_at: new Date().toISOString(),
-          total_recipients: comm.owners.length,
-        })
-        .select()
-        .single();
-
-      if (campaign) {
-        await supabase.from("campaign_rows").insert(
-          comm.owners.map(o => ({
-            campaign_id: campaign.id,
-            owner_id: o.id,
-            owner_name: o.name,
-            unit: o.unit,
-            phone: o.phone,
-            status: "sent" as const,
-          }))
-        );
-      }
-    }
-
+    const res = await fetch("/api/whatsapp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        communities: selectedComms,
+        message,
+        campaignTitle,
+        hasPdf,
+      }),
+    });
+    const json = await res.json();
+    setSendResults(json.results ?? []);
     setSending(false);
     setStep("enviado");
   };
@@ -86,18 +65,38 @@ export default function EnviarPage() {
     );
 
   if (step === "enviado") {
+    const totalSent = sendResults.reduce((s, r) => s + r.sent, 0);
+    const totalFailed = sendResults.reduce((s, r) => s + r.failed, 0);
     return (
-      <div className="max-w-lg mx-auto text-center py-20">
-        <div className="w-20 h-20 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-6">
-          <CheckCheck className="w-10 h-10 text-[#15803D]" />
+      <div className="max-w-lg mx-auto py-16">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-6">
+            <CheckCheck className="w-10 h-10 text-[#15803D]" />
+          </div>
+          <h2 className="text-2xl font-bold text-[#1A3C6E]">¡Aviso enviado!</h2>
+          <p className="text-[#475569] mt-2">
+            <strong className="text-[#15803D]">{totalSent} mensajes enviados</strong>
+            {totalFailed > 0 && <> · <strong className="text-red-500">{totalFailed} fallidos</strong></>}
+          </p>
         </div>
-        <h2 className="text-2xl font-bold text-[#1A3C6E]">¡Aviso registrado!</h2>
-        <p className="text-[#475569] mt-3">
-          Campaña guardada para <strong>{totalRecipients} propietarios</strong>. Cuando conectes la API de WhatsApp, se enviarán automáticamente.
-        </p>
-        <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+
+        {sendResults.length > 0 && (
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl shadow-sm divide-y divide-[#F8FAFC] mb-8">
+            {sendResults.map(r => (
+              <div key={r.community} className="flex items-center justify-between px-5 py-4 text-sm">
+                <span className="font-medium text-[#1E293B]">{r.community}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[#15803D] font-medium">✓ {r.sent}</span>
+                  {r.failed > 0 && <span className="text-red-500 font-medium">✗ {r.failed}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
-            onClick={() => { setStep("redactar"); setSelectedCommunities([]); setHasPdf(false); setCampaignTitle(""); }}
+            onClick={() => { setStep("redactar"); setSelectedCommunities([]); setHasPdf(false); setCampaignTitle(""); setSendResults([]); }}
             className="px-5 py-2.5 bg-[#1A56DB] text-white font-semibold rounded-xl hover:bg-[#1A3C6E] transition-colors"
           >
             Nuevo aviso
@@ -292,7 +291,7 @@ export default function EnviarPage() {
               <button onClick={() => setStep("seleccionar")} className="flex-1 py-3 border border-[#E2E8F0] bg-white text-[#475569] font-semibold rounded-xl hover:bg-[#F8FAFC]">← Atrás</button>
               <button onClick={handleSend} disabled={sending}
                 className="flex-1 py-3 bg-[#15803D] text-white font-semibold rounded-xl hover:bg-[#166534] disabled:opacity-60 flex items-center justify-center gap-2">
-                {sending ? <><span className="animate-spin">⏳</span> Guardando…</> : <><Send className="w-4 h-4" /> Enviar a {totalRecipients} propietarios</>}
+                {sending ? <><span className="animate-spin inline-block">⏳</span> Enviando por WhatsApp…</> : <><Send className="w-4 h-4" /> Enviar a {totalRecipients} propietarios</>}
               </button>
             </div>
           </div>
