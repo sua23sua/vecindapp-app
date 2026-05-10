@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   X,
+  CreditCard,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -19,6 +20,7 @@ const nav = [
   { href: "/comunidades",  label: "Comunidades",   icon: Building2 },
   { href: "/enviar",       label: "Enviar aviso",  icon: Send },
   { href: "/seguimiento",  label: "Seguimiento",   icon: ClipboardList },
+  { href: "/plan",         label: "Mi plan",       icon: CreditCard },
 ];
 
 export default function Sidebar() {
