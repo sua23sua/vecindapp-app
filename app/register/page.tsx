@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { MessageSquare, Lock, Mail, User, AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
@@ -23,17 +22,15 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: nombre },
-      },
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, nombre }),
     });
+    const json = await res.json();
 
-    if (error) {
-      setError(error.message === "User already registered" ? "Este email ya está registrado." : error.message);
+    if (!res.ok) {
+      setError(json.error ?? "Error al crear la cuenta.");
       setLoading(false);
       return;
     }
