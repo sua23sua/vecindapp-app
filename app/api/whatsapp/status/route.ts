@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 function instanceName(userId: string) {
   return `va_${userId.replace(/-/g, "").slice(0, 16)}`;
+}
+
+function appUrl() {
+  // NEXT_PUBLIC_APP_URL should be set in production; fall back to VERCEL_URL
+  const raw = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL;
+  if (!raw) return null;
+  return raw.startsWith("http") ? raw.replace(/\/$/, "") : `https://${raw}`;
 }
 
 export async function GET() {
@@ -28,12 +36,34 @@ export async function GET() {
     });
 
     if (res.status === 404) {
-      // Instance doesn't exist yet — create it and return QR
+      // Create instance
       await fetch(`${evoUrl}/instance/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: evoKey },
         body: JSON.stringify({ instanceName: instance, qrcode: true }),
       });
+
+      // Register instance → user_id mapping
+      const db = createAdminClient();
+      await db.from("whatsapp_instances").upsert(
+        { instance_name: instance, user_id: user.id },
+        { onConflict: "instance_name" }
+      );
+
+      // Configure webhook for incoming messages
+      const webhookBase = appUrl();
+      if (webhookBase) {
+        await fetch(`${evoUrl}/webhook/set/${instance}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: evoKey },
+          body: JSON.stringify({
+            url: `${webhookBase}/api/whatsapp/incoming`,
+            webhook_by_events: false,
+            webhook_base64: false,
+            events: ["MESSAGES_UPSERT"],
+          }),
+        });
+      }
     }
 
     // Get QR
