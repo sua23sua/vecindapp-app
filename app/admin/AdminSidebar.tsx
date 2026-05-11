@@ -10,6 +10,7 @@ const nav = [
   { href: "/admin/suscripciones", label: "Suscripciones",  icon: CreditCard },
   { href: "/admin/comunidades",   label: "Comunidades",    icon: Building2 },
   { href: "/admin/campanas",      label: "Campañas",       icon: Send },
+  { href: "/admin/whatsapp",      label: "WhatsApp",       icon: MessageSquare },
 ];
 
 export default function AdminSidebar() {
