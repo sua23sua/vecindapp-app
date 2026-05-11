@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Phone, Plus, Upload, Pencil, Trash2, Home, X, AlertCircle } from "lucide-react";
+import { Users, Phone, Plus, Upload, Pencil, Trash2, Home, X, AlertCircle, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 
 type Owner = {
@@ -34,6 +34,18 @@ export default function OwnersTable({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["nombre", "piso", "telefono"],
+      ["María García López", "1A", "612345678"],
+      ["Juan Martínez Ruiz", "2B", "698765432"],
+    ]);
+    ws["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 15 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Propietarios");
+    XLSX.writeFile(wb, "plantilla_propietarios.xlsx");
+  };
 
   const handleAdd = async () => {
     if (!newOwner.name || !newOwner.unit || !newOwner.phone) return;
@@ -206,6 +218,9 @@ export default function OwnersTable({
         <h2 className="font-semibold text-[#1A3C6E]">Propietarios</h2>
         <div className="flex gap-2">
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+          <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-2 border border-[#E2E8F0] bg-white text-sm font-medium text-[#475569] rounded-xl hover:border-[#1A56DB] hover:text-[#1A56DB] transition-colors">
+            <Download className="w-4 h-4" /> Plantilla
+          </button>
           <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 border border-[#E2E8F0] bg-white text-sm font-medium text-[#475569] rounded-xl hover:border-[#1A56DB] hover:text-[#1A56DB] transition-colors">
             <Upload className="w-4 h-4" /> Importar Excel
           </button>
