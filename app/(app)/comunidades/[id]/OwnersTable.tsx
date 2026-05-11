@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Phone, Plus, Upload, Pencil, Trash2, Home, X, AlertCircle, Download } from "lucide-react";
+import { Users, Phone, Plus, Upload, Pencil, Trash2, Home, X, AlertCircle, Download, ArrowRight } from "lucide-react";
 import * as XLSX from "xlsx";
 
 type Owner = {
@@ -13,6 +13,12 @@ type Owner = {
   phone: string;
   email: string | null;
   created_at: string;
+};
+
+type MappingState = {
+  headers: string[];
+  rows: Record<string, string>[];
+  map: { nombre: string; piso: string; telefono: string };
 };
 
 export default function OwnersTable({
@@ -29,7 +35,12 @@ export default function OwnersTable({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editOwner, setEditOwner] = useState({ name: "", unit: "", phone: "" });
+
+  // Classic import preview (auto-detected)
   const [importRows, setImportRows] = useState<{ name: string; unit: string; phone: string }[] | null>(null);
+  // Column mapper state
+  const [mapping, setMapping] = useState<MappingState | null>(null);
+
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -47,16 +58,12 @@ export default function OwnersTable({
       { key: "telefono", width: 18 },
     ];
 
-    // Native Excel table — format extends automatically as rows are added
     ws.addTable({
       name: "Propietarios",
       ref: "A1",
       headerRow: true,
       totalsRow: false,
-      style: {
-        theme: "TableStyleMedium9", // dark navy, closest to #1A3C6E
-        showRowStripes: true,
-      },
+      style: { theme: "TableStyleMedium9", showRowStripes: true },
       columns: [
         { name: "nombre",   filterButton: true },
         { name: "piso",     filterButton: true },
@@ -68,8 +75,6 @@ export default function OwnersTable({
         ["Ana Torres Sánchez", "3C", "654321987"],
       ],
     });
-
-    // Header row height
     ws.getRow(1).height = 22;
 
     const buf = await wb.xlsx.writeBuffer();
@@ -82,18 +87,96 @@ export default function OwnersTable({
     URL.revokeObjectURL(url);
   };
 
+  // Guess which column header matches a field
+  const guess = (headers: string[], ...candidates: string[]) => {
+    const lower = headers.map(h => h.toLowerCase().trim());
+    for (const c of candidates) {
+      const idx = lower.findIndex(h => h.includes(c));
+      if (idx !== -1) return headers[idx];
+    }
+    return "";
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: "" });
+
+      if (!json.length) return;
+      const headers = Object.keys(json[0]);
+
+      // Try auto-detect
+      const autoNombre   = guess(headers, "nombre", "name", "propietario", "titular");
+      const autoPiso     = guess(headers, "piso", "vivienda", "unidad", "unit", "portal");
+      const autoTelefono = guess(headers, "telef", "phone", "movil", "móvil", "celular");
+
+      // If all three auto-detected, go straight to preview
+      if (autoNombre && autoTelefono) {
+        const parsed = json.map(row => ({
+          name:  String(row[autoNombre] ?? "").trim(),
+          unit:  String(row[autoPiso]  ?? "").trim(),
+          phone: String(row[autoTelefono] ?? "").trim(),
+        })).filter(r => r.name && r.phone);
+        setImportRows(parsed);
+      } else {
+        // Show column mapper
+        setMapping({
+          headers,
+          rows: json as Record<string, string>[],
+          map: {
+            nombre:   autoNombre,
+            piso:     autoPiso,
+            telefono: autoTelefono,
+          },
+        });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  };
+
+  const applyMapping = () => {
+    if (!mapping) return;
+    const { rows, map } = mapping;
+    const parsed = rows.map(row => ({
+      name:  String(row[map.nombre]   ?? "").trim(),
+      unit:  String(row[map.piso]     ?? "").trim(),
+      phone: String(row[map.telefono] ?? "").trim(),
+    })).filter(r => r.name && r.phone);
+    setMapping(null);
+    setImportRows(parsed);
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importRows?.length) return;
+    setImporting(true);
+    const inserts = importRows.map(r => ({
+      community_id: communityId,
+      name: r.name,
+      unit: r.unit,
+      phone: r.phone,
+      email: null,
+    }));
+    const { data } = await supabase.from("owners").insert(inserts as any).select();
+    if (data) setOwners(prev => [...prev, ...(data as Owner[])]);
+    setImportRows(null);
+    setImporting(false);
+  };
+
   const handleAdd = async () => {
     if (!newOwner.name || !newOwner.unit || !newOwner.phone) return;
     setSaving(true);
     setError(null);
-
     const { data, error } = await supabase
       .from("owners")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({ community_id: communityId, name: newOwner.name, unit: newOwner.unit, phone: newOwner.phone, email: null } as any)
       .select()
       .single();
-
     if (error) {
       setError("Error al guardar. Inténtalo de nuevo.");
     } else {
@@ -107,51 +190,6 @@ export default function OwnersTable({
   const handleDelete = async (ownerId: string) => {
     const { error } = await supabase.from("owners").delete().eq("id", ownerId);
     if (!error) setOwners(prev => prev.filter(o => o.id !== ownerId));
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
-      const wb = XLSX.read(data, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: "" });
-      const normalize = (row: Record<string, string>, ...keys: string[]) => {
-        for (const k of keys) {
-          const val = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()] ?? "";
-          if (val) return String(val).trim();
-        }
-        return "";
-      };
-      const parsed = json.map(row => ({
-        name: normalize(row, "nombre", "name", "Nombre", "propietario", "Propietario"),
-        unit: normalize(row, "piso", "vivienda", "unidad", "unit", "Piso", "Vivienda"),
-        phone: normalize(row, "telefono", "teléfono", "phone", "movil", "móvil", "Teléfono"),
-      })).filter(r => r.name && r.phone);
-      setImportRows(parsed);
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = "";
-  };
-
-  const handleImportConfirm = async () => {
-    if (!importRows?.length) return;
-    setImporting(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setImporting(false); return; }
-    const inserts = importRows.map(r => ({
-      community_id: communityId,
-      name: r.name,
-      unit: r.unit,
-      phone: r.phone,
-      email: null,
-    }));
-    const { data } = await supabase.from("owners").insert(inserts as any).select();
-    if (data) setOwners(prev => [...prev, ...(data as Owner[])]);
-    setImportRows(null);
-    setImporting(false);
   };
 
   const startEdit = (o: Owner) => {
@@ -172,6 +210,8 @@ export default function OwnersTable({
     }
     setSaving(false);
   };
+
+  const selectClass = "w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A56DB] bg-white";
 
   return (
     <>
@@ -197,7 +237,74 @@ export default function OwnersTable({
         </div>
       </div>
 
-      {/* Import preview modal */}
+      {/* ── Column mapper modal ── */}
+      {mapping && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+              <div>
+                <p className="font-semibold text-[#1A3C6E]">Mapear columnas</p>
+                <p className="text-xs text-[#475569] mt-0.5">Tu archivo tiene {mapping.headers.length} columnas. Indica cuál corresponde a cada campo.</p>
+              </div>
+              <button onClick={() => setMapping(null)}><X className="w-5 h-5 text-[#475569]" /></button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {(["nombre", "piso", "telefono"] as const).map(field => {
+                const labels: Record<string, string> = {
+                  nombre:   "Nombre del propietario *",
+                  piso:     "Piso / Vivienda",
+                  telefono: "Teléfono *",
+                };
+                const required = field !== "piso";
+                return (
+                  <div key={field}>
+                    <label className="block text-xs font-medium text-[#475569] mb-1.5">
+                      {labels[field]}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#94A3B8] w-20 shrink-0">{field}</span>
+                      <ArrowRight className="w-3 h-3 text-[#94A3B8] shrink-0" />
+                      <select
+                        value={mapping.map[field]}
+                        onChange={e => setMapping(prev => prev ? { ...prev, map: { ...prev.map, [field]: e.target.value } } : prev)}
+                        className={selectClass}
+                      >
+                        {!required && <option value="">— No incluir —</option>}
+                        {required && <option value="">Selecciona una columna</option>}
+                        {mapping.headers.map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Preview value from first row */}
+                    {mapping.map[field] && mapping.rows[0] && (
+                      <p className="text-xs text-[#94A3B8] mt-1 ml-[6.5rem]">
+                        Ej: <span className="text-[#475569]">{String(mapping.rows[0][mapping.map[field]] ?? "")}</span>
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-[#E2E8F0]">
+              <button onClick={() => setMapping(null)} className="flex-1 py-2 border border-[#E2E8F0] text-sm font-medium text-[#475569] rounded-xl hover:bg-[#F8FAFC]">
+                Cancelar
+              </button>
+              <button
+                onClick={applyMapping}
+                disabled={!mapping.map.nombre || !mapping.map.telefono}
+                className="flex-1 py-2 bg-[#1A56DB] text-white text-sm font-medium rounded-xl hover:bg-[#1A3C6E] disabled:opacity-50"
+              >
+                Ver previsualización
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Import preview modal ── */}
       {importRows && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
@@ -231,7 +338,7 @@ export default function OwnersTable({
             {importRows.length === 0 && (
               <div className="px-6 py-8 text-center text-[#475569]">
                 <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">No se detectaron filas válidas. Asegúrate de que el Excel tiene columnas: <strong>nombre</strong>, <strong>piso</strong>, <strong>teléfono</strong>.</p>
+                <p className="text-sm">No se detectaron filas válidas.</p>
               </div>
             )}
             <div className="flex gap-3 px-6 py-4 border-t border-[#E2E8F0]">
@@ -297,11 +404,7 @@ export default function OwnersTable({
             />
           </div>
           <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleAdd}
-              disabled={saving}
-              className="px-4 py-2 bg-[#1A56DB] text-white text-sm font-medium rounded-xl hover:bg-[#1A3C6E] transition-colors disabled:opacity-60"
-            >
+            <button onClick={handleAdd} disabled={saving} className="px-4 py-2 bg-[#1A56DB] text-white text-sm font-medium rounded-xl hover:bg-[#1A3C6E] transition-colors disabled:opacity-60">
               {saving ? "Guardando…" : "Guardar"}
             </button>
             <button onClick={() => setShowAdd(false)} className="px-4 py-2 border border-[#E2E8F0] bg-white text-sm font-medium text-[#475569] rounded-xl">
