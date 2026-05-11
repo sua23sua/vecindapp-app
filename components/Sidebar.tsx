@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
   Building2,
@@ -30,10 +29,8 @@ export default function Sidebar() {
   const path = usePathname();
   const [open, setOpen] = useState(false);
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = "/login";
+  const handleLogout = () => {
+    window.location.href = "/api/auth/logout";
   };
 
   const NavLinks = () => (
