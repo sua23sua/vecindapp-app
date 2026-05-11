@@ -1,6 +1,8 @@
 import Stripe from "stripe";
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripBom = (s: string) => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+
+export const stripe = new Stripe(stripBom(process.env.STRIPE_SECRET_KEY!));
 
 export const PLANS = [
   {
