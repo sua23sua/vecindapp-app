@@ -1,5 +1,6 @@
 import { createAdminClient, listAuthUsers } from "@/lib/supabase/admin";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +38,12 @@ export default async function AdminUsuariosPage() {
               <th className="text-left px-5 py-3 font-semibold text-[#475569]">Estado</th>
               <th className="text-left px-5 py-3 font-semibold text-[#475569]">Email confirmado</th>
               <th className="text-left px-5 py-3 font-semibold text-[#475569]">Registro</th>
+              <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-[#F8FAFC]">
             {users.map(u => (
-              <tr key={u.id} className="hover:bg-[#F8FAFC] transition-colors">
+              <tr key={u.id} className="hover:bg-[#F8FAFC] transition-colors cursor-pointer">
                 <td className="px-5 py-3 font-medium text-[#1E293B]">{u.email}</td>
                 <td className="px-5 py-3 text-[#475569]">
                   {u.user_metadata?.full_name ?? "—"}
@@ -71,6 +73,11 @@ export default async function AdminUsuariosPage() {
                 </td>
                 <td className="px-5 py-3 text-[#475569]">
                   {new Date(u.created_at).toLocaleDateString("es-ES")}
+                </td>
+                <td className="px-5 py-3">
+                  <Link href={`/admin/usuarios/${u.id}`} className="text-[#1A56DB] hover:underline flex items-center gap-1 text-xs font-medium">
+                    Ver <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                 </td>
               </tr>
             ))}
