@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, listAuthUsers } from "@/lib/supabase/admin";
 import { CheckCircle, XCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,21 +11,20 @@ export default async function AdminUsuarioPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const db = createAdminClient();
 
-  // Fetch auth user via REST API
-  const origin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).origin;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const userRes = await fetch(`${origin}/auth/v1/admin/users/${id}`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
-    cache: "no-store",
-  });
-  if (!userRes.ok) notFound();
-  const authUser = await userRes.json();
-
-  const [{ data: sub }, { data: communities }, { data: campaigns }] = await Promise.all([
+  // Use listAuthUsers and find by id to reuse the safe helper
+  const [allUsers, { data: sub }, { data: communities }, { data: campaigns }] = await Promise.all([
+    listAuthUsers(),
     db.from("subscriptions").select("*").eq("user_id", id).single(),
     db.from("communities").select("id, name, address, owners(count)").eq("user_id", id),
-    db.from("campaigns").select("id, title, community_name, total_recipients, sent_at").eq("user_id", id).order("sent_at", { ascending: false }).limit(10),
+    db.from("campaigns")
+      .select("id, title, community_name, total_recipients, sent_at")
+      .eq("user_id", id)
+      .order("sent_at", { ascending: false })
+      .limit(10),
   ]);
+
+  const authUser = allUsers.find(u => u.id === id);
+  if (!authUser) notFound();
 
   const s = sub as any;
 
@@ -50,7 +49,9 @@ export default async function AdminUsuarioPage({ params }: { params: Promise<{ i
           </div>
           <div>
             <p className="text-[#475569] mb-1">Registro</p>
-            <p className="font-medium text-[#1E293B]">{new Date(authUser.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}</p>
+            <p className="font-medium text-[#1E293B]">
+              {new Date(authUser.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}
+            </p>
           </div>
           <div>
             <p className="text-[#475569] mb-1">Email confirmado</p>
@@ -98,7 +99,7 @@ export default async function AdminUsuarioPage({ params }: { params: Promise<{ i
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[#475569]">Sin suscripción activa</p>
+          <p className="text-sm text-[#475569]">Sin suscripción registrada.</p>
         )}
       </div>
 
