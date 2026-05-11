@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, Users, CreditCard, Building2, MessageSquare, Send, LogOut, Shield } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const nav = [
   { href: "/admin",               label: "Estadísticas",   icon: BarChart3 },
@@ -16,7 +17,8 @@ export default function AdminSidebar() {
   const path = usePathname();
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    const supabase = createClient();
+    await supabase.auth.signOut();
     window.location.href = "/login";
   };
 
