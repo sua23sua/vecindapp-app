@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { User, Lock, Users, Save, Send, Trash2, AlertCircle, CheckCheck, Zap } from "lucide-react";
+import { User, Lock, Users, Save, Send, Trash2, AlertCircle, CheckCheck, Zap, MessageSquare, Wifi, WifiOff, RefreshCw, LogOut, Info } from "lucide-react";
 import Link from "next/link";
 
 type Profile = {
@@ -43,7 +43,7 @@ function Toast({ msg, type }: { msg: string; type: "ok" | "err" }) {
 }
 
 export default function AjustesClient({ userId, userEmail, profile, isPlus, invites: initialInvites, planName }: Props) {
-  const [tab, setTab] = useState<"perfil" | "seguridad" | "equipo">("perfil");
+  const [tab, setTab] = useState<"perfil" | "seguridad" | "equipo" | "whatsapp">("perfil");
   const supabase = createClient();
 
   // --- Perfil ---
@@ -123,10 +123,46 @@ export default function AjustesClient({ userId, userEmail, profile, isPlus, invi
     setInvites(prev => prev.filter(i => i.id !== id));
   };
 
+  // --- WhatsApp ---
+  const [waStatus, setWaStatus] = useState<{
+    configured: boolean; connected: boolean; state?: string;
+    qr?: string | null; number?: string | null;
+  } | null>(null);
+  const [waLoading, setWaLoading] = useState(false);
+  const [waDisconnecting, setWaDisconnecting] = useState(false);
+
+  const fetchWaStatus = useCallback(async () => {
+    setWaLoading(true);
+    const res = await fetch("/api/whatsapp/status", { cache: "no-store" });
+    const data = await res.json();
+    setWaStatus(data);
+    setWaLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab === "whatsapp" && !waStatus) fetchWaStatus();
+  }, [tab, waStatus, fetchWaStatus]);
+
+  // Auto-refresh QR every 30s while disconnected
+  useEffect(() => {
+    if (tab !== "whatsapp" || waStatus?.connected) return;
+    const t = setInterval(fetchWaStatus, 30000);
+    return () => clearInterval(t);
+  }, [tab, waStatus?.connected, fetchWaStatus]);
+
+  const disconnectWa = async () => {
+    setWaDisconnecting(true);
+    await fetch("/api/whatsapp/status", { method: "DELETE" });
+    setWaStatus(null);
+    setWaDisconnecting(false);
+    fetchWaStatus();
+  };
+
   const tabs = [
-    { id: "perfil", label: "Perfil", icon: User },
-    { id: "seguridad", label: "Seguridad", icon: Lock },
-    { id: "equipo", label: "Equipo", icon: Users },
+    { id: "perfil",    label: "Perfil",     icon: User },
+    { id: "seguridad", label: "Seguridad",  icon: Lock },
+    { id: "equipo",    label: "Equipo",     icon: Users },
+    { id: "whatsapp",  label: "WhatsApp",   icon: MessageSquare },
   ] as const;
 
   return (
@@ -190,6 +226,120 @@ export default function AjustesClient({ userId, userEmail, profile, isPlus, invi
             className="flex items-center gap-2 px-5 py-2.5 bg-[#1A56DB] text-white text-sm font-semibold rounded-xl hover:bg-[#1A3C6E] transition-colors disabled:opacity-60">
             <Lock className="w-4 h-4" />{savingPwd ? "Guardando…" : "Cambiar contraseña"}
           </button>
+        </div>
+      )}
+
+      {/* WHATSAPP */}
+      {tab === "whatsapp" && (
+        <div className="space-y-4">
+          {/* Status card */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-semibold text-[#1A3C6E]">Conexión WhatsApp</h2>
+              <button onClick={fetchWaStatus} disabled={waLoading}
+                className="flex items-center gap-1.5 text-xs text-[#475569] hover:text-[#1A56DB] transition-colors">
+                <RefreshCw className={`w-3.5 h-3.5 ${waLoading ? "animate-spin" : ""}`} />
+                Actualizar
+              </button>
+            </div>
+
+            {waLoading && !waStatus && (
+              <div className="flex items-center gap-3 py-4">
+                <RefreshCw className="w-5 h-5 text-[#475569] animate-spin" />
+                <span className="text-sm text-[#475569]">Comprobando estado…</span>
+              </div>
+            )}
+
+            {waStatus && !waStatus.configured && (
+              <div className="bg-[#FFF7ED] border border-orange-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-orange-800 text-sm">Evolution API no configurada</p>
+                    <p className="text-orange-700 text-sm mt-1">
+                      La integración con WhatsApp requiere un servidor propio con Evolution API.
+                      Contacta con soporte para activarla en tu cuenta.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {waStatus?.configured && waStatus.connected && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 bg-[#F0FDF4] border border-[#15803D]/20 rounded-xl px-4 py-3">
+                  <Wifi className="w-5 h-5 text-[#15803D]" />
+                  <div className="flex-1">
+                    <p className="font-medium text-[#15803D] text-sm">WhatsApp conectado</p>
+                    {waStatus.number && <p className="text-xs text-[#15803D]/70 mt-0.5">{waStatus.number}</p>}
+                  </div>
+                  <button onClick={disconnectWa} disabled={waDisconnecting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 text-xs font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60">
+                    <LogOut className="w-3.5 h-3.5" />
+                    {waDisconnecting ? "Desconectando…" : "Desconectar"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {waStatus?.configured && !waStatus.connected && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 bg-[#FFF7ED] border border-orange-200 rounded-xl px-4 py-3 mb-2">
+                  <WifiOff className="w-5 h-5 text-orange-500" />
+                  <p className="text-sm text-orange-700 font-medium">Sin conexión — escanea el QR para vincular tu número</p>
+                </div>
+
+                {waStatus.qr ? (
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={waStatus.qr} alt="QR WhatsApp" className="w-52 h-52 rounded-2xl border border-[#E2E8F0] shadow-sm" />
+                    <p className="text-xs text-[#475569] text-center max-w-xs">
+                      Abre WhatsApp en tu móvil de trabajo → Dispositivos vinculados → Vincular dispositivo → Escanea este QR
+                    </p>
+                    <p className="text-xs text-[#94A3B8]">El QR se actualiza automáticamente cada 30 segundos</p>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-[#475569]">No se pudo cargar el QR.</p>
+                    <button onClick={fetchWaStatus} className="mt-2 text-sm text-[#1A56DB] hover:underline">Reintentar</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Info card */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold text-[#1A3C6E] mb-4">Cómo funciona</h3>
+            <div className="space-y-3 text-sm text-[#475569]">
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#EFF6FF] text-[#1A56DB] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                <p>Vincula el número de trabajo de tu despacho (no el personal). Recomendamos una SIM dedicada exclusiva para la plataforma.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#EFF6FF] text-[#1A56DB] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                <p>Desde ese número se enviarán todos los avisos a los propietarios de tus comunidades.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#EFF6FF] text-[#1A56DB] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                <p>Los propietarios pueden responder directamente y el sistema registra automáticamente si leyeron o confirmaron el mensaje.</p>
+              </div>
+            </div>
+
+            <div className="mt-5 border-t border-[#F1F5F9] pt-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-[#1E293B]">Si usas el número para chats normales</p>
+                  <p className="text-[#475569] mt-1">
+                    Cuando escribas manualmente a un propietario, ese contacto entra en <strong>modo manual 24 h</strong> —
+                    el bot no responderá automáticamente para no interrumpir tu conversación.
+                    Los estados de lectura y confirmación siguen registrándose correctamente.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
