@@ -15,6 +15,11 @@ const nav = [
 export default function AdminSidebar() {
   const path = usePathname();
 
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
   return (
     <aside className="hidden lg:flex flex-col w-60 bg-[#0F1E3C] h-screen sticky top-0">
       <div className="flex items-center gap-2 px-6 h-16 border-b border-white/10">
@@ -52,12 +57,12 @@ export default function AdminSidebar() {
         >
           <MessageSquare className="w-5 h-5" /> Volver a la app
         </Link>
-        <Link
-          href="/login"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/10 transition-all"
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/10 transition-all w-full"
         >
           <LogOut className="w-5 h-5" /> Cerrar sesión
-        </Link>
+        </button>
       </div>
     </aside>
   );
