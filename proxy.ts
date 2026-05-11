@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  // Skip all middleware logic for logout — let the route handler handle everything
+  if (request.nextUrl.pathname === "/api/auth/logout") {
+    return NextResponse.next({ request });
+  }
+
   const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
