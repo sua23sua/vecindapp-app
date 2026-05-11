@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getPlanStatus } from "@/lib/plan-status";
 
 const EVO_URL = process.env.EVOLUTION_API_URL?.replace(/\/$/, "");
 const EVO_KEY = process.env.EVOLUTION_API_KEY;
@@ -51,6 +52,22 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Block sends if grace period expired
+  const planStatus = await getPlanStatus(user.id);
+  if (planStatus.status === "blocked") {
+    const daysOver = planStatus.overLimitSince
+      ? Math.floor((Date.now() - planStatus.overLimitSince.getTime()) / 86_400_000)
+      : planStatus.gracePeriodDays;
+    return NextResponse.json(
+      {
+        error: "plan_blocked",
+        message: `Los envíos están pausados porque llevas más de ${planStatus.gracePeriodDays} días por encima del límite de tu plan. Actualiza tu plan para continuar.`,
+        daysOver,
+      },
+      { status: 403 }
+    );
+  }
 
   const formData = await req.formData();
   const rawData = formData.get("data") as string;

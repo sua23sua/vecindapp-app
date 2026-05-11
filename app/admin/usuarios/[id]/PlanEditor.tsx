@@ -10,6 +10,7 @@ type Props = {
   currentPlan: string;
   currentTier: string;
   currentStatus: string;
+  currentGraceDays: number;
   plans: Plan[];
 };
 
@@ -20,10 +21,11 @@ const STATUSES = [
   { value: "inactive", label: "Sin plan" },
 ];
 
-export default function PlanEditor({ userId, currentPlan, currentTier, currentStatus, plans }: Props) {
+export default function PlanEditor({ userId, currentPlan, currentTier, currentStatus, currentGraceDays, plans }: Props) {
   const [plan, setPlan] = useState(currentPlan);
   const [tier, setTier] = useState(currentTier);
   const [status, setStatus] = useState(currentStatus);
+  const [graceDays, setGraceDays] = useState(currentGraceDays);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export default function PlanEditor({ userId, currentPlan, currentTier, currentSt
     const res = await fetch(`/api/admin/users/${userId}/plan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan, tier, status }),
+      body: JSON.stringify({ plan, tier, status, gracePeriodDays: graceDays }),
     });
 
     const json = await res.json();
@@ -49,7 +51,7 @@ export default function PlanEditor({ userId, currentPlan, currentTier, currentSt
     setLoading(false);
   };
 
-  const changed = plan !== currentPlan || tier !== currentTier || status !== currentStatus;
+  const changed = plan !== currentPlan || tier !== currentTier || status !== currentStatus || graceDays !== currentGraceDays;
 
   return (
     <div className="bg-white rounded-2xl border-2 border-amber-200 p-6 shadow-sm mb-6">
@@ -97,6 +99,20 @@ export default function PlanEditor({ userId, currentPlan, currentTier, currentSt
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <label className="block text-xs font-medium text-[#475569] mb-1.5">
+          Días de gracia por exceso de propietarios <span className="text-[#94A3B8]">(por defecto 30)</span>
+        </label>
+        <input
+          type="number"
+          min={1}
+          max={365}
+          value={graceDays}
+          onChange={e => setGraceDays(Number(e.target.value))}
+          className="w-32 px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+        />
       </div>
 
       {error && (

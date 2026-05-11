@@ -109,6 +109,7 @@ export default async function AdminUsuarioPage({ params }: { params: Promise<{ i
         currentPlan={s?.plan ?? ""}
         currentTier={s?.tier ?? "base"}
         currentStatus={s?.status ?? "inactive"}
+        currentGraceDays={s?.grace_period_days ?? 30}
         plans={PLANS.map(p => ({ id: p.id, name: p.name }))}
       />
 

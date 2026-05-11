@@ -23,6 +23,7 @@ export default function EnviarPage() {
   const [sending, setSending] = useState(false);
   const [campaignTitle, setCampaignTitle] = useState("");
   const [sendResults, setSendResults] = useState<{ community: string; sent: number; failed: number }[]>([]);
+  const [blockedError, setBlockedError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -45,12 +46,20 @@ export default function EnviarPage() {
 
   const handleSend = async () => {
     setSending(true);
+    setBlockedError(null);
     const formData = new FormData();
     formData.append("data", JSON.stringify({ communities: selectedComms, message, campaignTitle }));
     if (pdfFile) formData.append("pdf", pdfFile);
 
     const res = await fetch("/api/whatsapp", { method: "POST", body: formData });
     const json = await res.json();
+
+    if (!res.ok && json.error === "plan_blocked") {
+      setBlockedError(json.message);
+      setSending(false);
+      return;
+    }
+
     setSendResults(json.results ?? []);
     setSending(false);
     setStep("enviado");
@@ -293,6 +302,13 @@ export default function EnviarPage() {
                 ))}
               </div>
             </div>
+
+            {blockedError && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
+                <p className="text-red-700 text-sm font-medium">{blockedError}</p>
+                <a href="/plan" className="mt-2 inline-block text-sm font-semibold text-red-700 underline">Actualizar plan →</a>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button onClick={() => setStep("seleccionar")} className="flex-1 py-3 border border-[#E2E8F0] bg-white text-[#475569] font-semibold rounded-xl hover:bg-[#F8FAFC]">← Atrás</button>

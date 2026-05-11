@@ -16,11 +16,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { id: userId } = await params;
-  const { plan, tier, status, note } = await req.json() as {
+  const { plan, tier, status, gracePeriodDays } = await req.json() as {
     plan: string;
     tier: string;
     status: string;
-    note?: string;
+    gracePeriodDays?: number;
   };
 
   const db = createAdminClient();
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       current_period_end: status === "active"
         ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         : null,
+      ...(gracePeriodDays !== undefined ? { grace_period_days: gracePeriodDays } : {}),
       updated_at: new Date().toISOString(),
     } as any, { onConflict: "user_id" });
 
