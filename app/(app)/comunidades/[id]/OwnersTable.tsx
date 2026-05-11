@@ -35,16 +35,62 @@ export default function OwnersTable({
 
   const supabase = createClient();
 
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["nombre", "piso", "telefono"],
-      ["María García López", "1A", "612345678"],
-      ["Juan Martínez Ruiz", "2B", "698765432"],
-    ]);
-    ws["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 15 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Propietarios");
-    XLSX.writeFile(wb, "plantilla_propietarios.xlsx");
+  const downloadTemplate = async () => {
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "VecindApp";
+    const ws = wb.addWorksheet("Propietarios");
+
+    ws.columns = [
+      { header: "nombre",   key: "nombre",   width: 32 },
+      { header: "piso",     key: "piso",     width: 12 },
+      { header: "telefono", key: "telefono", width: 18 },
+    ];
+
+    // Header row style
+    const headerRow = ws.getRow(1);
+    headerRow.eachCell(cell => {
+      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A3C6E" } };
+      cell.font   = { bold: true, color: { argb: "FFFFFFFF" }, size: 11, name: "Calibri" };
+      cell.border = {
+        bottom: { style: "medium", color: { argb: "FF1A56DB" } },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    });
+    headerRow.height = 22;
+
+    // Example rows
+    const examples = [
+      { nombre: "María García López",  piso: "1A", telefono: "612345678" },
+      { nombre: "Juan Martínez Ruiz",  piso: "2B", telefono: "698765432" },
+      { nombre: "Ana Torres Sánchez",  piso: "3C", telefono: "654321987" },
+    ];
+    examples.forEach((row, i) => {
+      const r = ws.addRow(row);
+      const bg = i % 2 === 0 ? "FFEFF6FF" : "FFFFFFFF";
+      r.eachCell(cell => {
+        cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+        cell.font      = { size: 11, name: "Calibri", color: { argb: "FF1E293B" } };
+        cell.alignment = { vertical: "middle" };
+        cell.border    = { bottom: { style: "thin", color: { argb: "FFE2E8F0" } } };
+      });
+      r.height = 20;
+    });
+
+    // Footer note
+    ws.addRow([]);
+    const noteRow = ws.addRow(["⚠ Rellena a partir de la fila 2. No cambies los nombres de las columnas.", "", ""]);
+    noteRow.getCell(1).font = { italic: true, color: { argb: "FF94A3B8" }, size: 10 };
+    ws.mergeCells(`A${noteRow.number}:C${noteRow.number}`);
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "plantilla_propietarios.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleAdd = async () => {
