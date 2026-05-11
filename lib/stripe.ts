@@ -1,8 +1,9 @@
 import Stripe from "stripe";
 
 const stripBom = (s: string) => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+const e = (key: string) => stripBom(process.env[key] ?? "");
 
-export const stripe = new Stripe(stripBom(process.env.STRIPE_SECRET_KEY!));
+export const stripe = new Stripe(e("STRIPE_SECRET_KEY"));
 
 export const PLANS = [
   {
@@ -11,8 +12,8 @@ export const PLANS = [
     owners: 50,
     priceBase: 19,
     pricePlus: 29,
-    priceIdBase: process.env.STRIPE_PRICE_STARTER_BASE!,
-    priceIdPlus: process.env.STRIPE_PRICE_STARTER_PLUS!,
+    priceIdBase: e("STRIPE_PRICE_STARTER_BASE"),
+    priceIdPlus: e("STRIPE_PRICE_STARTER_PLUS"),
   },
   {
     id: "profesional",
@@ -20,8 +21,8 @@ export const PLANS = [
     owners: 150,
     priceBase: 39,
     pricePlus: 59,
-    priceIdBase: process.env.STRIPE_PRICE_PROFESIONAL_BASE!,
-    priceIdPlus: process.env.STRIPE_PRICE_PROFESIONAL_PLUS!,
+    priceIdBase: e("STRIPE_PRICE_PROFESIONAL_BASE"),
+    priceIdPlus: e("STRIPE_PRICE_PROFESIONAL_PLUS"),
   },
   {
     id: "avanzado",
@@ -29,8 +30,8 @@ export const PLANS = [
     owners: 300,
     priceBase: 69,
     pricePlus: 99,
-    priceIdBase: process.env.STRIPE_PRICE_AVANZADO_BASE!,
-    priceIdPlus: process.env.STRIPE_PRICE_AVANZADO_PLUS!,
+    priceIdBase: e("STRIPE_PRICE_AVANZADO_BASE"),
+    priceIdPlus: e("STRIPE_PRICE_AVANZADO_PLUS"),
   },
   {
     id: "gestoria",
@@ -38,8 +39,8 @@ export const PLANS = [
     owners: 600,
     priceBase: 119,
     pricePlus: 169,
-    priceIdBase: process.env.STRIPE_PRICE_GESTORIA_BASE!,
-    priceIdPlus: process.env.STRIPE_PRICE_GESTORIA_PLUS!,
+    priceIdBase: e("STRIPE_PRICE_GESTORIA_BASE"),
+    priceIdPlus: e("STRIPE_PRICE_GESTORIA_PLUS"),
   },
   {
     id: "corporativo",
@@ -47,8 +48,8 @@ export const PLANS = [
     owners: 1500,
     priceBase: 199,
     pricePlus: 279,
-    priceIdBase: process.env.STRIPE_PRICE_CORPORATIVO_BASE!,
-    priceIdPlus: process.env.STRIPE_PRICE_CORPORATIVO_PLUS!,
+    priceIdBase: e("STRIPE_PRICE_CORPORATIVO_BASE"),
+    priceIdPlus: e("STRIPE_PRICE_CORPORATIVO_PLUS"),
   },
 ] as const;
 
