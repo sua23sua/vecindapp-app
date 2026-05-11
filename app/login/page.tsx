@@ -27,7 +27,8 @@ export default function LoginPage() {
       return;
     }
 
-    window.location.href = "/dashboard";
+    const { isAdmin } = await fetch("/api/auth/me").then(r => r.json());
+    window.location.href = isAdmin ? "/admin" : "/dashboard";
   };
 
   return (
