@@ -18,18 +18,23 @@ export async function POST(req: NextRequest) {
 
   const customerId = (sub as any)?.stripe_customer_id as string | undefined;
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    payment_method_types: ["card"],
-    customer: customerId,
-    customer_email: customerId ? undefined : user.email,
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/plan?success=1`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/plan?canceled=1`,
-    metadata: { user_id: user.id },
-    subscription_data: { metadata: { user_id: user.id } },
-    locale: "es",
-  });
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      payment_method_types: ["card"],
+      customer: customerId,
+      customer_email: customerId ? undefined : user.email,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/plan?success=1`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/plan?canceled=1`,
+      metadata: { user_id: user.id },
+      subscription_data: { metadata: { user_id: user.id } },
+      locale: "es",
+    });
 
-  return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: session.url });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }

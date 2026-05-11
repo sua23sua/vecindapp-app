@@ -20,14 +20,23 @@ export default function PlanActions(props: Props) {
 
   const handleCheckout = async (priceId: string) => {
     setLoading(true);
-    const res = await fetch("/api/stripe/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ priceId }),
-    });
-    const { url } = await res.json();
-    if (url) window.location.href = url;
-    else setLoading(false);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId }),
+      });
+      const json = await res.json();
+      if (json.url) {
+        window.location.href = json.url;
+      } else {
+        alert(json.error ?? "Error al conectar con Stripe. Comprueba la configuración.");
+        setLoading(false);
+      }
+    } catch {
+      alert("Error inesperado. Inténtalo de nuevo.");
+      setLoading(false);
+    }
   };
 
   if (props.mode === "portal") {
