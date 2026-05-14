@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRef } from "react";
-import { Send, Paperclip, Eye, Users, CheckCheck, X } from "lucide-react";
+import { Send, Paperclip, Eye, Users, CheckCheck, X, Search } from "lucide-react";
 
 const VARIABLES = ["{{nombre}}", "{{vivienda}}", "{{comunidad}}", "{{fecha_junta}}"];
 
@@ -24,6 +24,7 @@ export default function EnviarPage() {
   const [campaignTitle, setCampaignTitle] = useState("");
   const [sendResults, setSendResults] = useState<{ community: string; sent: number; failed: number }[]>([]);
   const [blockedError, setBlockedError] = useState<string | null>(null);
+  const [communitySearch, setCommunitySearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -215,8 +216,19 @@ export default function EnviarPage() {
             {communities.length === 0 ? (
               <p className="text-sm text-[#475569]">Cargando comunidades…</p>
             ) : (
+              <>
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar comunidad…"
+                    value={communitySearch}
+                    onChange={e => setCommunitySearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A56DB]"
+                  />
+                </div>
               <div className="space-y-3">
-                {communities.map(c => {
+                {communities.filter(c => c.name.toLowerCase().includes(communitySearch.toLowerCase())).map(c => {
                   const selected = selectedCommunities.includes(c.id);
                   return (
                     <label key={c.id} className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${selected ? "border-[#1A56DB] bg-[#EFF6FF]" : "border-[#E2E8F0] hover:border-[#1A56DB]/40"}`}>
@@ -232,6 +244,10 @@ export default function EnviarPage() {
                   );
                 })}
               </div>
+              {communitySearch && communities.filter(c => c.name.toLowerCase().includes(communitySearch.toLowerCase())).length === 0 && (
+                <p className="text-sm text-[#94A3B8] text-center py-4">No hay comunidades con ese nombre.</p>
+              )}
+              </>
             )}
           </div>
 
