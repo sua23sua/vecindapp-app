@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const EVO_URL = process.env.EVOLUTION_API_URL?.replace(/\/$/, "");
 const EVO_KEY = process.env.EVOLUTION_API_KEY;
 
-const CONFIRMATION_RE = /\b(s[íi]|ok|confirmado?|recib[io]do?|enterado?|visto|gracias|vale|perfecto|leído|leido)\b/i;
+const CONFIRMATION_RE = /(s[íi]|ok|confirm[ao](d[ao])?|recib[io]d[ao]|enteran?d[ao]?|visto|gracias|vale|perfecto|le[íi]d[ao])/i;
 
 async function sendText(instance: string, phone: string, text: string) {
   if (!EVO_URL || !EVO_KEY) return;
