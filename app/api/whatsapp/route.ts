@@ -4,7 +4,6 @@ import { getPlanStatus } from "@/lib/plan-status";
 
 const EVO_URL = process.env.EVOLUTION_API_URL?.replace(/\/$/, "");
 const EVO_KEY = process.env.EVOLUTION_API_KEY;
-const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE;
 
 type Owner = { id: string; name: string; unit: string; phone: string };
 type CommunityPayload = {
@@ -28,12 +27,12 @@ function interpolate(tpl: string, owner: Owner, commName: string): string {
     .replace(/{{fecha_junta}}/g, new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }));
 }
 
-async function sendWhatsApp(phone: string, text: string): Promise<{ ok: boolean; error?: string }> {
-  if (!EVO_URL || !EVO_KEY || !EVO_INSTANCE) {
+async function sendWhatsApp(phone: string, text: string, instance: string): Promise<{ ok: boolean; error?: string }> {
+  if (!EVO_URL || !EVO_KEY || !instance) {
     return { ok: false, error: "Evolution API no configurada" };
   }
   try {
-    const res = await fetch(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`, {
+    const res = await fetch(`${EVO_URL}/message/sendText/${instance}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: EVO_KEY },
       body: JSON.stringify({ number: phone, textMessage: { text } }),
@@ -68,6 +67,15 @@ export async function POST(req: NextRequest) {
       { status: 403 }
     );
   }
+
+  // Get the WhatsApp instance for this user
+  const { data: instanceRow } = await supabase
+    .from("whatsapp_instances")
+    .select("instance_name")
+    .eq("user_id", user.id)
+    .single();
+
+  const evoInstance = instanceRow?.instance_name ?? `va_${user.id.replace(/-/g, "").slice(0, 16)}`;
 
   const formData = await req.formData();
   const rawData = formData.get("data") as string;
@@ -127,7 +135,7 @@ export async function POST(req: NextRequest) {
       const rowId = rowMap.get(owner.id);
       const phone = normalizePhone(owner.phone);
       const text = interpolate(message, owner, comm.name);
-      const result = await sendWhatsApp(phone, text);
+      const result = await sendWhatsApp(phone, text, evoInstance);
 
       if (rowId) {
         await supabase
