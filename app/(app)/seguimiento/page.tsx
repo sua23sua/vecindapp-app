@@ -32,7 +32,9 @@ export default async function SeguimientoPage({
 
   const { data: completed } = await completedQuery;
 
-  if (!active?.length && !completed?.length) {
+  const hasFilters = !!(q || from || to);
+
+  if (!active?.length && !completed?.length && !hasFilters) {
     return (
       <div>
         <div className="mb-8">
