@@ -34,11 +34,13 @@ async function sendPdf(phone: string, base64: string, fileName: string, instance
     headers: { "Content-Type": "application/json", apikey: EVO_KEY },
     body: JSON.stringify({
       number: phone,
-      mediatype: "document",
-      mimetype: "application/pdf",
-      media: base64,
-      fileName,
-      caption: "",
+      mediaMessage: {
+        mediatype: "document",
+        mimetype: "application/pdf",
+        media: base64,
+        fileName,
+        caption: "",
+      },
     }),
   }).catch(() => {});
 }
