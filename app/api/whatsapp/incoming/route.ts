@@ -107,6 +107,20 @@ export async function POST(req: NextRequest) {
   const key = msg?.key as Record<string, unknown> | undefined;
   const fromMe = key?.fromMe as boolean | undefined;
   const remoteJid = key?.remoteJid as string | undefined;
+  const msgId = key?.id as string | undefined;
+
+  // Deduplicate: skip if already processed this message ID in the last 2 min
+  if (msgId) {
+    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: existing } = await db
+      .from("whatsapp_processed_msgs")
+      .select("id")
+      .eq("msg_id", msgId)
+      .gt("processed_at", twoMinAgo)
+      .single();
+    if (existing) return NextResponse.json({ ok: true });
+    await db.from("whatsapp_processed_msgs").insert({ msg_id: msgId, processed_at: new Date().toISOString() }).single();
+  }
 
   if (!remoteJid) return NextResponse.json({ ok: true });
   if (remoteJid.endsWith("@g.us")) return NextResponse.json({ ok: true });
