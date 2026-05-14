@@ -27,6 +27,22 @@ function interpolate(tpl: string, owner: Owner, commName: string): string {
     .replace(/{{fecha_junta}}/g, new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }));
 }
 
+async function sendPdf(phone: string, base64: string, fileName: string, instance: string): Promise<void> {
+  if (!EVO_URL || !EVO_KEY || !instance) return;
+  await fetch(`${EVO_URL}/message/sendMedia/${instance}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: EVO_KEY },
+    body: JSON.stringify({
+      number: phone,
+      mediatype: "document",
+      mimetype: "application/pdf",
+      media: base64,
+      fileName,
+      caption: "",
+    }),
+  }).catch(() => {});
+}
+
 async function sendWhatsApp(phone: string, text: string, instance: string): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   if (!EVO_URL || !EVO_KEY || !instance) {
     return { ok: false, error: "Evolution API no configurada" };
@@ -88,6 +104,10 @@ export async function POST(req: NextRequest) {
     campaignTitle: string;
   };
   const hasPdf = !!pdfFile;
+  const pdfBase64 = pdfFile
+    ? Buffer.from(await pdfFile.arrayBuffer()).toString("base64")
+    : null;
+  const pdfName = pdfFile?.name ?? "documento.pdf";
 
   const results: { community: string; sent: number; failed: number }[] = [];
 
@@ -147,6 +167,10 @@ export async function POST(req: NextRequest) {
             ...(result.messageId ? { message_id: result.messageId } : {}),
           } as any)
           .eq("id", rowId);
+      }
+
+      if (result.ok && pdfBase64) {
+        await sendPdf(phone, pdfBase64, pdfName, evoInstance);
       }
 
       result.ok ? sent++ : failed++;
