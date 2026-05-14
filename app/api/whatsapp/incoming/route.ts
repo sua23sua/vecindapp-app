@@ -171,6 +171,8 @@ export async function POST(req: NextRequest) {
       .limit(1);
 
     if (rows?.[0]) {
+      const campaignId = rows[0].campaign_id as string;
+
       await db
         .from("campaign_rows")
         .update({
@@ -179,6 +181,22 @@ export async function POST(req: NextRequest) {
           reply: text.slice(0, 500),
         })
         .eq("id", rows[0].id);
+
+      // Auto-completar campaña si ya no quedan filas pendientes
+      const { data: pending } = await db
+        .from("campaign_rows")
+        .select("id")
+        .eq("campaign_id", campaignId)
+        .neq("status", "confirmed")
+        .neq("status", "failed")
+        .limit(1);
+
+      if (!pending?.length) {
+        await db
+          .from("campaigns")
+          .update({ status: "completed" } as never)
+          .eq("id", campaignId);
+      }
     }
   }
 

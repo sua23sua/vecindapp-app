@@ -26,7 +26,7 @@ export default function CampaignCard({ campaign }: { campaign: Campaign }) {
 
   const rows = campaign.campaign_rows ?? [];
   const confirmed = rows.filter(r => r.status === "confirmed").length;
-  const read = rows.filter(r => r.status === "read").length;
+  const read = rows.filter(r => r.status === "read" || r.status === "confirmed").length;
   const failed = rows.filter(r => r.status === "failed").length;
   const date = new Date(campaign.sent_at);
 
