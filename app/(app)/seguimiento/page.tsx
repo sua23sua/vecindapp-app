@@ -83,10 +83,15 @@ export default async function SeguimientoPage() {
                               {statusLabel[row.status] ?? row.status}
                             </span>
                           </td>
-                          <td className="px-5 py-3 text-[#475569]">{row.read_at ?? "—"}</td>
+                          <td className="px-5 py-3 text-[#475569]">
+                            {row.read_at ? new Date(row.read_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          </td>
                           <td className="px-5 py-3">
                             {row.confirmed_at
-                              ? <span className="text-[#15803D]">{row.confirmed_at} {row.reply && <span className="text-[#475569]">"{row.reply}"</span>}</span>
+                              ? <span className="text-[#15803D]">
+                                  {new Date(row.confirmed_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                  {row.reply && <span className="text-[#475569] ml-1">"{row.reply}"</span>}
+                                </span>
                               : <span className="text-[#475569]">—</span>}
                           </td>
                         </tr>
