@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       owner_id: o.id,
       owner_name: o.name,
       unit: o.unit,
-      phone: o.phone,
+      phone: normalizePhone(o.phone),
       status: "sent",
     }));
 
