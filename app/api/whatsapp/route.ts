@@ -27,7 +27,7 @@ function interpolate(tpl: string, owner: Owner, commName: string): string {
     .replace(/{{fecha_junta}}/g, new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }));
 }
 
-async function sendWhatsApp(phone: string, text: string, instance: string): Promise<{ ok: boolean; error?: string }> {
+async function sendWhatsApp(phone: string, text: string, instance: string): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   if (!EVO_URL || !EVO_KEY || !instance) {
     return { ok: false, error: "Evolution API no configurada" };
   }
@@ -41,7 +41,9 @@ async function sendWhatsApp(phone: string, text: string, instance: string): Prom
       const body = await res.text().catch(() => "");
       return { ok: false, error: `HTTP ${res.status}: ${body.slice(0, 200)}` };
     }
-    return { ok: true };
+    const json = await res.json().catch(() => ({}));
+    const messageId = (json as any)?.key?.id as string | undefined;
+    return { ok: true, messageId };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -140,7 +142,10 @@ export async function POST(req: NextRequest) {
       if (rowId) {
         await supabase
           .from("campaign_rows")
-          .update({ status: result.ok ? "delivered" : "failed" } as any)
+          .update({
+            status: result.ok ? "delivered" : "failed",
+            ...(result.messageId ? { message_id: result.messageId } : {}),
+          } as any)
           .eq("id", rowId);
       }
 

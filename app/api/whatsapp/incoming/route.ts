@@ -6,7 +6,6 @@ export const dynamic = "force-dynamic";
 const EVO_URL = process.env.EVOLUTION_API_URL?.replace(/\/$/, "");
 const EVO_KEY = process.env.EVOLUTION_API_KEY;
 
-// Words that count as a confirmation reply from a resident
 const CONFIRMATION_RE = /\b(s[íi]|ok|confirmado?|recib[io]do?|enterado?|visto|gracias|vale|perfecto|leído|leido)\b/i;
 
 async function sendText(instance: string, phone: string, text: string) {
@@ -18,8 +17,23 @@ async function sendText(instance: string, phone: string, text: string) {
   }).catch(() => {});
 }
 
+async function resolvePhone(db: ReturnType<typeof createAdminClient>, userId: string, remoteJid: string): Promise<string | null> {
+  if (remoteJid.endsWith("@s.whatsapp.net")) {
+    return remoteJid.replace("@s.whatsapp.net", "");
+  }
+  if (remoteJid.endsWith("@lid")) {
+    const { data } = await db
+      .from("whatsapp_jid_map")
+      .select("phone")
+      .eq("user_id", userId)
+      .eq("lid", remoteJid)
+      .single();
+    return data?.phone ?? null;
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
-  // Verify request comes from our Evolution API instance
   const apikey = req.headers.get("apikey");
   if (EVO_KEY && apikey && apikey !== EVO_KEY) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,33 +46,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Only handle incoming message events
   const event = body.event as string | undefined;
-  if (event !== "MESSAGES_UPSERT" && event !== "messages.upsert") {
-    return NextResponse.json({ ok: true });
-  }
-
   const instanceName = body.instance as string | undefined;
-  const msg = body.data as Record<string, unknown> | undefined;
-  const key = msg?.key as Record<string, unknown> | undefined;
-  const fromMe = key?.fromMe as boolean | undefined;
-  const remoteJid = key?.remoteJid as string | undefined;
-
-  if (!remoteJid || !instanceName) return NextResponse.json({ ok: true });
-
-  // Ignore group messages
-  if (remoteJid.endsWith("@g.us")) return NextResponse.json({ ok: true });
-
-  const phone = remoteJid.replace("@s.whatsapp.net", "");
-  const message = msg?.message as Record<string, unknown> | undefined;
-  const text: string =
-    (message?.conversation as string) ??
-    ((message?.extendedTextMessage as Record<string, unknown>)?.text as string) ??
-    "";
+  if (!instanceName) return NextResponse.json({ ok: true });
 
   const db = createAdminClient();
 
-  // Look up which user owns this instance
   const { data: inst } = await db
     .from("whatsapp_instances")
     .select("user_id")
@@ -68,8 +61,67 @@ export async function POST(req: NextRequest) {
   if (!inst) return NextResponse.json({ ok: true });
   const userId = inst.user_id as string;
 
+  // ── MESSAGES_UPDATE: build lid→phone map and track read status ──
+  if (event === "MESSAGES_UPDATE" || event === "messages.update") {
+    const updates = Array.isArray(body.data) ? body.data : [body.data];
+    for (const update of updates as Record<string, unknown>[]) {
+      if (!update) continue;
+      const remoteJid = update.remoteJid as string | undefined;
+      const messageId = update.id as string | undefined;
+      const fromMe = update.fromMe as boolean | undefined;
+      const status = update.status as string | undefined;
+
+      if (!remoteJid || !messageId || !fromMe) continue;
+
+      if (remoteJid.endsWith("@lid")) {
+        // Find the phone from campaign_rows using messageId → build lid map
+        const { data: row } = await db
+          .from("campaign_rows")
+          .select("id, phone")
+          .eq("message_id", messageId)
+          .single();
+
+        if (row?.phone) {
+          await db
+            .from("whatsapp_jid_map")
+            .upsert({ user_id: userId, lid: remoteJid, phone: row.phone, updated_at: new Date().toISOString() }, { onConflict: "user_id,lid" });
+
+          if (status === "READ") {
+            await db
+              .from("campaign_rows")
+              .update({ status: "read", read_at: new Date().toISOString() } as any)
+              .eq("id", row.id);
+          }
+        }
+      }
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── MESSAGES_UPSERT: handle incoming replies ──
+  if (event !== "MESSAGES_UPSERT" && event !== "messages.upsert") {
+    return NextResponse.json({ ok: true });
+  }
+
+  const msg = body.data as Record<string, unknown> | undefined;
+  const key = msg?.key as Record<string, unknown> | undefined;
+  const fromMe = key?.fromMe as boolean | undefined;
+  const remoteJid = key?.remoteJid as string | undefined;
+
+  if (!remoteJid) return NextResponse.json({ ok: true });
+  if (remoteJid.endsWith("@g.us")) return NextResponse.json({ ok: true });
+
+  const message = msg?.message as Record<string, unknown> | undefined;
+  const text: string =
+    (message?.conversation as string) ??
+    ((message?.extendedTextMessage as Record<string, unknown>)?.text as string) ??
+    "";
+
   // ── Admin sent a message manually → activate 24h manual mode ──
   if (fromMe) {
+    const phone = remoteJid.endsWith("@s.whatsapp.net")
+      ? remoteJid.replace("@s.whatsapp.net", "")
+      : remoteJid;
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await db
       .from("whatsapp_manual_mode")
@@ -77,9 +129,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // ── Resident sent a message ──
+  // ── Resident replied ──
+  const phone = await resolvePhone(db, userId, remoteJid);
+  if (!phone) return NextResponse.json({ ok: true });
 
-  // Check if this contact is in manual mode (admin chatted in last 24h)
+  // Check manual mode
   const { data: manualRow } = await db
     .from("whatsapp_manual_mode")
     .select("expires_at")
@@ -88,11 +142,10 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (manualRow && new Date(manualRow.expires_at) > new Date()) {
-    // Manual mode active — do not auto-respond, let admin handle it
     return NextResponse.json({ ok: true });
   }
 
-  // Try to mark a pending campaign row as confirmed
+  // Mark confirmation
   if (CONFIRMATION_RE.test(text)) {
     const { data: rows } = await db
       .from("campaign_rows")
@@ -115,7 +168,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Auto-reply to acknowledge receipt
   await sendText(instanceName, phone, "Gracias por su mensaje. Ha sido registrado correctamente.");
 
   return NextResponse.json({ ok: true });
