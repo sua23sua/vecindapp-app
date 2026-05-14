@@ -5,6 +5,7 @@ import { ArrowLeft, FileText, Users, CheckCheck, Eye, AlertCircle } from "lucide
 import CampaignTable from "../CampaignTable";
 import ExportButton from "../ExportButton";
 import DeleteCampaignButton from "./DeleteCampaignButton";
+import CompleteCampaignButton from "./CompleteCampaignButton";
 
 export const dynamic = "force-dynamic";
 
@@ -75,9 +76,14 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
         <CampaignTable rows={rows} />
 
-        <div className="px-6 py-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex items-center justify-between gap-4">
+        <div className="px-6 py-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex items-center justify-between gap-4 flex-wrap">
           <ExportButton campaign={campaign} />
-          <DeleteCampaignButton campaignId={campaign.id} />
+          <div className="flex items-center gap-4">
+            {campaign.status === "active" && (
+              <CompleteCampaignButton campaignId={campaign.id} />
+            )}
+            <DeleteCampaignButton campaignId={campaign.id} />
+          </div>
         </div>
       </div>
     </div>
