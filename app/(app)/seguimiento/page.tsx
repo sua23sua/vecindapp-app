@@ -36,7 +36,7 @@ export default async function SeguimientoPage() {
     return rows.length > 0 && rows.every((r: { status: string }) => r.status === "confirmed");
   });
 
-  function CampaignCard({ c }: { c: typeof campaigns[0] }) {
+  function CampaignCard({ c }: { c: (typeof campaigns)[number] }) {
     const rows = c.campaign_rows ?? [];
     const confirmed = rows.filter((r: { status: string }) => r.status === "confirmed").length;
     const read      = rows.filter((r: { status: string }) => r.status === "read").length;
